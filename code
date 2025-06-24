@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mission: Me</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #f0f0f0;
+      color: #333;
+      transition: background-color 0.5s, color 0.5s;
+    }
+    header {
+      background-color: #4a90e2;
+      padding: 1em;
+      text-align: center;
+      color: white;
+      font-size: 1.5em;
+      position: relative;
+    }
+    #missionContainer {
+      padding: 2em;
+      text-align: center;
+    }
+    .btn {
+      padding: 0.8em 1.2em;
+      margin: 0.5em;
+      font-size: 1em;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      background-color: #4a90e2;
+      color: white;
+      transition: background-color 0.3s;
+    }
+    .btn:hover {
+      background-color: #357abd;
+    }
+    #shopBtn, #fireworkBtn, #resetBtn, #tutorialBtn {
+      position: fixed;
+      top: 1em;
+      font-size: 0.8em;
+    }
+    #shopBtn { right: 1em; }
+    #tutorialBtn { right: 6em; }
+    #fireworkBtn { left: 1em; }
+    #resetBtn { left: 6em; }
+    #coinsDisplay {
+      position: fixed;
+      top: 1em;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #fff;
+      padding: 0.5em 1em;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      font-weight: bold;
+    }
+    #popupContainer {
+      position: fixed;
+      right: 1em;
+      bottom: 1em;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+    .popup {
+      background: #4a90e2;
+      color: white;
+      padding: 0.5em 1em;
+      margin-top: 0.3em;
+      border-radius: 8px;
+      animation: fadeOut 4s forwards;
+    }
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(100px); }
+    }
+    #shopOverlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: white;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      font-size: 1.2em;
+    }
+    .themeBtn {
+      margin: 1em;
+    }
+    #exitShopBtn {
+      position: absolute;
+      top: 1em;
+      right: 1em;
+    }
+  </style>
+</head>
+<body>
+  <header>Mission: Me</header>
+  <div id="coinsDisplay">Münzen: 0</div>
+  <button class="btn" id="fireworkBtn">🎆</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <button class="btn" id="tutorialBtn">❓</button>
+  <button class="btn" id="shopBtn">Shop</button>
+  <div id="missionContainer">
+    <button class="btn" id="startBtn">Los geht’s!</button>
+    <button class="btn" id="newTaskBtn" style="display:none">Andere Aufgabe</button>
+    <button class="btn" id="doneBtn" style="display:none">Aufgabe erledigt</button>
+    <p id="currentTask"></p>
+  </div>
+  <div id="popupContainer"></div>
+
+  <div id="shopOverlay">
+    <button class="btn" id="exitShopBtn">Schließen ✖</button>
+    <h2>Themes freischalten:</h2>
+    <button class="btn themeBtn" data-theme="dark">🌙 Darkmode – 100 Münzen</button>
+    <button class="btn themeBtn" data-theme="rainbow">🌈 Farbenfroh – 100 Münzen</button>
+    <button class="btn themeBtn" data-theme="ocean">🌊 Ocean Blue – 100 Münzen</button>
+    <button class="btn themeBtn" data-theme="desert">🏜️ Desert Yellow – 100 Münzen</button>
+  </div>
+
+  <script>
+    const tasks = [
+      'Trinke ein Glas Wasser',
+      'Atme 10x tief durch',
+      'Ordne deinen Schreibtisch',
+      'Schreibe 3 Dinge auf, für die du dankbar bist',
+      'Mach 10 Kniebeugen',
+      'Gehe 5 Minuten spazieren',
+      'Stell dein Handy auf lautlos',
+      'Meditiere für 2 Minuten',
+      'Lächle dich im Spiegel an',
+      'Lies eine Seite in einem Buch',
+      'Sortiere Dateien auf deinem Desktop',
+      'Räume 3 Dinge auf',
+      'Schreibe einer netten Person',
+      'Strecke dich für 1 Minute',
+      'Setz dich gerade hin',
+      'Tanze für 1 Lied',
+      'Lerne ein neues Wort',
+      'Mach 10 Hampelmänner',
+      'Lass frische Luft ins Zimmer',
+      'Lösche 5 unnötige Apps/Bilder'
+    ];
+
+    let coins = 0;
+    let unlockedThemes = {};
+    let currentTheme = '';
+
+    const startBtn = document.getElementById('startBtn');
+    const newTaskBtn = document.getElementById('newTaskBtn');
+    const doneBtn = document.getElementById('doneBtn');
+    const currentTask = document.getElementById('currentTask');
+    const coinsDisplay = document.getElementById('coinsDisplay');
+    const popupContainer = document.getElementById('popupContainer');
+    const shopOverlay = document.getElementById('shopOverlay');
+
+    function showPopup(msg) {
+      if (popupContainer.children.length >= 1) return;
+      const popup = document.createElement('div');
+      popup.className = 'popup';
+      popup.innerText = msg;
+      popupContainer.appendChild(popup);
+      setTimeout(() => popup.remove(), 4000);
+    }
+
+    function getRandomTask() {
+      return tasks[Math.floor(Math.random() * tasks.length)];
+    }
+
+    function updateCoinsDisplay() {
+      coinsDisplay.innerText = `Münzen: ${coins}`;
+      if (coins >= 100) {
+        showPopup('🎉 Du kannst jetzt ein neues Theme freischalten!');
+      }
+    }
+
+    function applyTheme(name) {
+      document.body.className = '';
+      switch (name) {
+        case 'dark':
+          document.body.style.backgroundColor = '#222';
+          document.body.style.color = '#eee';
+          break;
+        case 'rainbow':
+          let hue = 0;
+          clearInterval(window.rainbowInterval);
+          window.rainbowInterval = setInterval(() => {
+            document.body.style.backgroundColor = `hsl(${hue}, 80%, 70%)`;
+            hue = (hue + 1) % 360;
+          }, 100);
+          break;
+        case 'ocean':
+          document.body.style.backgroundColor = '#004488';
+          document.body.style.color = '#cceeff';
+          break;
+        case 'desert':
+          document.body.style.backgroundColor = '#f4e2d8';
+          document.body.style.color = '#5c4033';
+          break;
+        default:
+          document.body.style.backgroundColor = '#f0f0f0';
+          document.body.style.color = '#333';
+          clearInterval(window.rainbowInterval);
+      }
+    }
+
+    startBtn.onclick = () => {
+      currentTask.innerText = getRandomTask();
+      startBtn.style.display = 'none';
+      newTaskBtn.style.display = 'inline-block';
+      doneBtn.style.display = 'inline-block';
+    };
+
+    newTaskBtn.onclick = () => {
+      currentTask.innerText = getRandomTask();
+    };
+
+    doneBtn.onclick = () => {
+      coins += 5;
+      updateCoinsDisplay();
+    };
+
+    document.getElementById('shopBtn').onclick = () => {
+      shopOverlay.style.display = 'flex';
+    };
+
+    document.getElementById('exitShopBtn').onclick = () => {
+      shopOverlay.style.display = 'none';
+    };
+
+    document.querySelectorAll('.themeBtn').forEach(btn => {
+      btn.onclick = () => {
+        const theme = btn.dataset.theme;
+        if (unlockedThemes[theme]) {
+          applyTheme(theme);
+          currentTheme = theme;
+        } else if (coins >= 100) {
+          coins -= 100;
+          unlockedThemes[theme] = true;
+          applyTheme(theme);
+          currentTheme = theme;
+          updateCoinsDisplay();
+        } else {
+          showPopup('❌ Nicht genug Münzen!');
+        }
+      };
+    });
+
+    document.getElementById('fireworkBtn').onclick = () => {
+      if (coins >= 50) {
+        coins -= 50;
+        updateCoinsDisplay();
+        showPopup('🎆 Boom! Feuerwerk gestartet!');
+      } else {
+        showPopup('❌ Nicht genug Münzen für Feuerwerk!');
+      }
+    };
+
+    document.getElementById('resetBtn').onclick = () => {
+      coins = 0;
+      unlockedThemes = {};
+      currentTheme = '';
+      applyTheme('');
+      updateCoinsDisplay();
+      showPopup('🔄 Alles wurde zurückgesetzt!');
+    };
+
+    document.getElementById('tutorialBtn').onclick = () => {
+      alert('🧠 So funktioniert Mission: Me:\n\n1. Klicke auf "Los geht’s!"\n2. Erledige deine 5-Minuten-Aufgabe\n3. Verdiene Münzen und schalte Themes frei!');
+    };
+  </script>
+</body>
+</html>
